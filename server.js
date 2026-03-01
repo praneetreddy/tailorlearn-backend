@@ -5,7 +5,6 @@ import axios from "axios";
 
 dotenv.config();
 const app = express();
-const PORT = process.env.PORT || 10000;
 
 app.use(cors({
   origin: "https://tailorlearn-frontend.onrender.com"
@@ -16,7 +15,7 @@ app.get("/", (req, res) => {
   res.send("Mentoro AI Backend is Running 🚀");
 });
 
-// Create video clip with D-ID V3 Pro
+// Create a video clip
 app.post("/talk-video", async (req, res) => {
   try {
     const { message, presenter } = req.body;
@@ -24,7 +23,7 @@ app.post("/talk-video", async (req, res) => {
     const response = await axios.post(
       "https://api.d-id.com/clips",
       {
-        presenter_id: presenter, // e.g., "v2_public_Amber@0zSz8kflCN"
+        presenter_id: presenter,
         script: {
           type: "text",
           input: message
@@ -32,47 +31,41 @@ app.post("/talk-video", async (req, res) => {
       },
       {
         headers: {
-          "Authorization": `Basic ${process.env.DID_API_KEY}`,
+          "Authorization": `Basic ${process.env.DID_API_KEY}`, // IMPORTANT: Basic auth
           "Content-Type": "application/json"
         }
       }
     );
 
-    // Return clip id to frontend
     res.json({ clip_id: response.data.id });
-
-  } catch (error) {
-    console.error(error.response?.data || error.message);
+  } catch (err) {
+    console.error(err.response?.data || err.message);
     res.status(500).json({ error: "AI video generation failed" });
   }
 });
 
-// Check status of clip and get video URL
+// Poll video status
 app.get("/clip/:id", async (req, res) => {
   try {
-    const clipId = req.params.id;
-
+    const id = req.params.id;
     const response = await axios.get(
-      `https://api.d-id.com/clips/${clipId}`,
+      `https://api.d-id.com/clips/${id}`,
       {
         headers: {
-          "Authorization": `Basic ${process.env.DID_API_KEY}`,
+          "Authorization": `Basic ${process.env.DID_API_KEY}`
         }
       }
     );
 
-    // Send status + video URL if ready
-    res.json({
-      status: response.data.status,
-      url: response.data.output_url || null
-    });
-
-  } catch (error) {
-    console.error(error.response?.data || error.message);
-    res.status(500).json({ error: "Failed to fetch clip status" });
+    if (response.data.output_url) {
+      return res.json({ status: "succeeded", url: response.data.output_url });
+    }
+    return res.json({ status: response.data.status });
+  } catch (err) {
+    console.error(err.response?.data || err.message);
+    res.status(500).json({ error: "Failed to fetch video status" });
   }
 });
 
-app.listen(PORT, () => {
-  console.log(`Server running on port ${PORT}`);
-});
+const PORT = process.env.PORT || 10000;
+app.listen(PORT, () => console.log(`Server running on port ${PORT}`));
