@@ -1,24 +1,27 @@
-import express from "express";
-import cors from "cors";
-import dotenv from "dotenv";
-import axios from "axios";
+const express = require("express");
+const cors = require("cors");
+const axios = require("axios");
+require("dotenv").config();
 
-dotenv.config();
 const app = express();
 
-app.use(cors({
-  origin: "https://tailorlearn-frontend.onrender.com"
-}));
-
+// Middleware
+app.use(cors());
 app.use(express.json());
 
+// Test Route
 app.get("/", (req, res) => {
   res.send("Mentoro AI Backend is Running 🚀");
 });
 
+// Chat Route
 app.post("/chat", async (req, res) => {
   try {
-    const { message } = req.body;
+    const userMessage = req.body.message;
+
+    if (!userMessage) {
+      return res.status(400).json({ error: "No message provided" });
+    }
 
     const response = await axios.post(
       "https://api.groq.com/openai/v1/chat/completions",
@@ -26,32 +29,33 @@ app.post("/chat", async (req, res) => {
         model: "llama3-8b-8192",
         messages: [
           {
-            role: "system",
-            content: "You are an expert teacher who gives structured lessons."
-          },
-          {
             role: "user",
-            content: message
-          }
-        ]
+            content: userMessage,
+          },
+        ],
+        temperature: 0.7,
       },
       {
         headers: {
-          "Authorization": `Bearer ${process.env.GROQ_API_KEY}`,
-          "Content-Type": "application/json"
-        }
+          Authorization: `Bearer ${process.env.GROQ_API_KEY}`,
+          "Content-Type": "application/json",
+        },
       }
     );
 
-    res.json({ reply: response.data.choices[0].message.content });
+    res.json({
+      reply: response.data.choices[0].message.content,
+    });
 
   } catch (error) {
-    console.error(error);
-    res.status(500).json({ error: "AI error" });
+    console.error("Groq Error:", error.response?.data || error.message);
+    res.status(500).json({ error: "AI request failed" });
   }
 });
 
-const port = process.env.PORT || 3000;
-app.listen(port, () => {
-  console.log(`Server running on port ${port}`);
+// Use Render's PORT
+const PORT = process.env.PORT || 10000;
+
+app.listen(PORT, () => {
+  console.log(`Server running on port ${PORT}`);
 });
