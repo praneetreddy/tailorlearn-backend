@@ -7,12 +7,13 @@ import axios from "axios";
 dotenv.config();
 const app = express();
 
+// --- Middleware ---
 app.use(cors({
   origin: ["https://tailorlearn-frontend.onrender.com", "http://localhost:3000"]
 }));
 app.use(express.json());
 
-// Health check
+// --- Health check ---
 app.get("/", (req,res)=>{
     res.send("Mentoro AI Backend is Running 🚀");
 });
@@ -21,13 +22,16 @@ app.get("/", (req,res)=>{
 app.post("/chat", async (req,res)=>{
     try{
         const { message, interview } = req.body;
-        // You can switch to OpenAI or keep using Groq
+
         const response = await axios.post(
             "https://api.groq.com/openai/v1/chat/completions",
             {
-                model:"llama2-7b", // updated model
+                model:"llama2-7b", // updated supported model
                 messages:[
-                    { role:"system", content: interview ? "You are an expert AI interview coach. Give precise answers focused only on the current interview topic." : "You are an expert teacher who gives structured lessons." },
+                    { role:"system", content: interview ? 
+                        "You are an expert AI interview coach. Give precise answers focused only on the current interview topic." : 
+                        "You are an expert teacher who gives structured lessons." 
+                    },
                     { role:"user", content: message }
                 ]
             },
@@ -38,7 +42,9 @@ app.post("/chat", async (req,res)=>{
                 }
             }
         );
+
         res.json({ reply: response.data.choices[0].message.content });
+
     } catch(err){
         console.error(err.response?.data || err.message);
         res.status(500).json({ error:"AI error" });
@@ -49,12 +55,14 @@ app.post("/chat", async (req,res)=>{
 app.post("/talk-video", async (req,res)=>{
     try{
         const { text, avatar="male" } = req.body;
-        const response = await axios.post(
+
+        // Step 1: create video job
+        const createRes = await axios.post(
             "https://api.d-id.com/talks",
             {
-                script: { type:"text", input:text },
-                voice: "alloy",
-                driver: avatar // "male" or "female"
+                script:{ type:"text", input:text },
+                voice:"alloy",
+                driver: avatar
             },
             {
                 headers:{
@@ -63,7 +71,26 @@ app.post("/talk-video", async (req,res)=>{
                 }
             }
         );
-        res.json({ videoUrl: response.data.url || response.data.result_url });
+
+        const videoId = createRes.data.id;
+        if(!videoId) return res.status(500).json({ error:"Failed to start AI video job" });
+
+        // Step 2: poll until video is ready
+        let videoUrl = null;
+        for(let i=0;i<15;i++){  // max 15 tries (~30 sec)
+            await new Promise(r=>setTimeout(r,2000));
+            const statusRes = await axios.get(`https://api.d-id.com/talks/${videoId}`, {
+                headers:{ "Authorization": `Bearer ${process.env.DID_API_KEY}` }
+            });
+            if(statusRes.data.status==="done" && statusRes.data.result_url){
+                videoUrl = statusRes.data.result_url;
+                break;
+            }
+        }
+
+        if(videoUrl) res.json({ videoUrl });
+        else res.status(500).json({ error:"AI video not ready yet" });
+
     } catch(err){
         console.error(err.response?.data || err.message);
         res.status(500).json({ error:"AI video generation failed" });
