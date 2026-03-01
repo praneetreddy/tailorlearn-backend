@@ -4,18 +4,21 @@ import dotenv from "dotenv";
 import axios from "axios";
 
 dotenv.config();
-
 const app = express();
-app.use(cors());
+
+app.use(cors({
+  origin: "https://tailorlearn-frontend.onrender.com"
+}));
+
 app.use(express.json());
 
 app.get("/", (req, res) => {
   res.send("Mentoro AI Backend is Running 🚀");
 });
 
-app.post("/ask-ai", async (req, res) => {
+app.post("/chat", async (req, res) => {
   try {
-    const userMessage = req.body.message;
+    const { message } = req.body;
 
     const response = await axios.post(
       "https://api.groq.com/openai/v1/chat/completions",
@@ -24,11 +27,11 @@ app.post("/ask-ai", async (req, res) => {
         messages: [
           {
             role: "system",
-            content: "You are an expert teacher who gives structured lessons with examples."
+            content: "You are an expert teacher who gives structured lessons."
           },
           {
             role: "user",
-            content: userMessage
+            content: message
           }
         ]
       },
@@ -40,16 +43,10 @@ app.post("/ask-ai", async (req, res) => {
       }
     );
 
-    res.json({
-      reply: response.data.choices[0].message.content
-    });
+    res.json({ reply: response.data.choices[0].message.content });
 
   } catch (error) {
-    console.log(error.response?.data || error.message);
-    res.status(500).json({ error: "Something went wrong" });
+    console.error(error);
+    res.status(500).json({ error: "AI error" });
   }
-});
-
-app.listen(3000, () => {
-  console.log("Server running on port 3000");
 });
