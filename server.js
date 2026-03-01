@@ -23,25 +23,25 @@ app.post("/chat", async (req, res) => {
       return res.status(400).json({ error: "No message provided" });
     }
 
-    const response = await axios.post(
-      "https://api.groq.com/openai/v1/chat/completions",
+const response = await axios.post(
+  "https://api.groq.com/openai/v1/chat/completions",
+  {
+    model: "llama-3.1-8b-instant",
+    messages: [
       {
-        model: "llama3-8b-8192",
-        messages: [
-          {
-            role: "user",
-            content: userMessage,
-          },
-        ],
-        temperature: 0.7,
+        role: "user",
+        content: userMessage,
       },
-      {
-        headers: {
-          Authorization: `Bearer ${process.env.GROQ_API_KEY}`,
-          "Content-Type": "application/json",
-        },
-      }
-    );
+    ],
+    temperature: 0.7,
+  },
+  {
+    headers: {
+      Authorization: `Bearer ${process.env.GROQ_API_KEY}`,
+      "Content-Type": "application/json",
+    },
+  }
+);
 
     res.json({
       reply: response.data.choices[0].message.content,
